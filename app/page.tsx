@@ -968,7 +968,10 @@ function Footer() {
       <h2>Rotary Club of Kitende Breeze</h2>
       <p>Presidential Installation · President-Elect Richard Mujjuzi · 4th July 2026</p>
       <p>Nican Resort, Kampala Uganda</p>
-      <small>Built with ❤️ for fellowship</small>
+
+      <a className="footer-powered" href="https://savaralabs.com" target="_blank" rel="noreferrer">
+        Powered by Savaralabs
+      </a>
     </footer>
   );
 }
