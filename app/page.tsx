@@ -144,7 +144,7 @@ const purposeOptions = [
     key: 'Other',
     title: 'Other',
     subtitle: 'Tell us more',
-    icon: <SparkIcon />,
+    icon: <MessageIcon />,
   },
 ];
 
@@ -268,14 +268,12 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    const handleLogoClick = (event: MouseEvent) => {
+    const handleLogoClick = (event: globalThis.MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
 
       if (!target) return;
 
-      const logo = target.closest(
-        '.rotary-wordmark, .rotary-wheel-icon, .rotary-wheel-outline, .card-icon, .success-brand',
-      );
+      const logo = target.closest('.rotary-wheel-icon, .rotary-wheel-outline');
 
       if (!logo) return;
 
@@ -487,10 +485,7 @@ export default function Page() {
         <div className="hero-grid">
           <div className="hero-copy">
             <div className="hero-item hero-badge-wrap" style={{ '--delay': '0ms' } as CSSProperties}>
-              <span className="hero-badge">
-                <i />
-                PRESIDENTIAL INSTALLATION CEREMONY
-              </span>
+              <span className="hero-badge">PRESIDENTIAL INSTALLATION CEREMONY</span>
             </div>
 
             <h1 className="hero-title hero-item" style={{ '--delay': '150ms' } as CSSProperties}>
@@ -501,9 +496,12 @@ export default function Page() {
             <div className="hero-separator hero-item" style={{ '--delay': '280ms' } as CSSProperties} />
 
             <div className="hero-meta hero-item" style={{ '--delay': '380ms' } as CSSProperties}>
-              <p>PE Richard Mujjuzi Installation</p>
               <p>
-                4th July 2026 <span>·</span> Nican Resort, Kampala
+                <strong>President-Elect Richard Mujjuzi</strong>
+              </p>
+              <p>
+                Presidential Installation <span>·</span> 4th July 2026 <span>·</span> Nican Resort,
+                Kampala
               </p>
             </div>
 
@@ -829,7 +827,7 @@ function SuccessState({
 }) {
   return (
     <div className="registration-card success-card">
-      <div className="success-brand">
+      <div className="success-brand success-brand-celebrate" aria-hidden="true">
         <RotaryWheelIcon />
       </div>
 
@@ -938,7 +936,8 @@ function Nav({ onRegister }: { onRegister: () => void }) {
   return (
     <nav className="nav">
       <a href="#welcome" className="nav-brand">
-        <RotaryWordmarkLogo className="nav-logo" />
+        <span className="brand-rotary-word">Rotary</span>
+        <RotaryWheelIcon className="nav-wheel" />
         <span className="club-chip">Kitende Breeze</span>
       </a>
 
@@ -967,7 +966,7 @@ function Footer() {
       <RotaryWordmarkLogo className="footer-logo" />
 
       <h2>Rotary Club of Kitende Breeze</h2>
-      <p>Presidential Installation · PE Richard Mujjuzi · 4th July 2026</p>
+      <p>Presidential Installation · President-Elect Richard Mujjuzi · 4th July 2026</p>
       <p>Nican Resort, Kampala Uganda</p>
       <small>Built with ❤️ for fellowship</small>
     </footer>
@@ -1108,11 +1107,12 @@ function HeartIcon() {
   );
 }
 
-function SparkIcon() {
+function MessageIcon() {
   return (
     <IconSvg>
-      <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />
-      <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" />
+      <path d="M21 12a8.5 8.5 0 0 1-8.5 8.5H6.8L3 22l1.4-3.6A8.5 8.5 0 1 1 21 12Z" />
+      <path d="M8 11.5h8" />
+      <path d="M8 15h5.5" />
     </IconSvg>
   );
 }

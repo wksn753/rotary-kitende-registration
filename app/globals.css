@@ -94,6 +94,7 @@ mark {
 }
 
 /* Splash */
+
 .splash {
   position: fixed;
   inset: 0;
@@ -215,6 +216,7 @@ mark {
 }
 
 /* Nav */
+
 .nav {
   position: fixed;
   top: 0;
@@ -235,20 +237,31 @@ mark {
 .nav-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-width: max-content;
 }
 
-.nav-logo {
-  width: 88px;
+.brand-rotary-word {
+  color: var(--rotary-blue);
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.nav-wheel {
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
+  margin-left: -3px;
+  margin-right: 4px;
 }
 
 .club-chip {
   color: white;
   font-family: 'Outfit', sans-serif;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.02em;
 }
 
@@ -318,7 +331,66 @@ mark {
   color: var(--navy);
 }
 
+/* Logo interactions */
+
+.rotary-wordmark:hover,
+.rotary-wordmark.logo-clicked,
+.card-icon:hover,
+.card-icon.logo-clicked,
+.success-brand:hover,
+.success-brand.logo-clicked {
+  animation: none !important;
+  transform: none !important;
+}
+
+:where(.rotary-wheel-icon, .rotary-wheel-outline) {
+  transform-origin: center;
+  transform-box: fill-box;
+  will-change: transform;
+}
+
+:where(.rotary-wheel-icon, .rotary-wheel-outline):hover {
+  animation: rotary-logo-hover-rotate 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+:where(.rotary-wheel-icon, .rotary-wheel-outline).logo-clicked {
+  animation: rotary-logo-click-bounce 0.68s cubic-bezier(0.2, 0.9, 0.28, 1.25) both !important;
+}
+
+@keyframes rotary-logo-hover-rotate {
+  from {
+    transform: rotate(0deg) scale(1);
+  }
+
+  to {
+    transform: rotate(360deg) scale(1.04);
+  }
+}
+
+@keyframes rotary-logo-click-bounce {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  28% {
+    transform: rotate(-10deg) scale(0.88);
+  }
+
+  58% {
+    transform: rotate(16deg) scale(1.16);
+  }
+
+  78% {
+    transform: rotate(340deg) scale(0.97);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
 /* Hero */
+
 .hero {
   position: relative;
   min-height: 100vh;
@@ -411,26 +483,17 @@ mark {
 .hero-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   width: fit-content;
-  padding: 5px 12px;
-  border: 1px solid rgba(247, 168, 27, 0.35);
-  border-radius: 4px;
-  background: rgba(247, 168, 27, 0.12);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--gold);
   font-family: 'Outfit', sans-serif;
   font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
+  font-weight: 600;
+  letter-spacing: 0.22em;
   line-height: 1;
-}
-
-.hero-badge i {
-  display: block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--gold);
 }
 
 .hero-title {
@@ -478,6 +541,11 @@ mark {
 
 .hero-meta p {
   margin: 0;
+}
+
+.hero-meta strong {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
 }
 
 .hero-meta span {
@@ -539,6 +607,7 @@ mark {
 }
 
 /* Card */
+
 .registration-card {
   width: 100%;
   max-width: 480px;
@@ -565,13 +634,13 @@ mark {
   height: 44px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 10px;
-  background: var(--gold-pale);
+  border-radius: 0;
+  background: white;
 }
 
 .card-icon .rotary-wheel-icon {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
 }
 
 .card-header p {
@@ -1088,14 +1157,29 @@ mark {
 }
 
 /* Success */
+
 .success-card {
   padding: 32px 24px;
   text-align: center;
 }
 
 .success-brand {
-  width: 28px;
-  margin: 0 auto 14px;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+}
+
+.success-brand .rotary-wheel-icon {
+  width: 34px;
+  height: 34px;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.success-brand-celebrate .rotary-wheel-icon {
+  animation: success-logo-bounce-rotate 1.15s cubic-bezier(0.18, 0.9, 0.24, 1.25) 0.12s both;
 }
 
 .success-check {
@@ -1179,6 +1263,7 @@ mark {
 }
 
 /* Mobile toast */
+
 .mobile-toast {
   position: fixed;
   left: 50%;
@@ -1209,7 +1294,37 @@ mark {
   }
 }
 
+@keyframes success-logo-bounce-rotate {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.55) rotate(0deg);
+  }
+
+  28% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1.22) rotate(120deg);
+  }
+
+  48% {
+    transform: translateY(4px) scale(0.92) rotate(210deg);
+  }
+
+  68% {
+    transform: translateY(-5px) scale(1.08) rotate(300deg);
+  }
+
+  84% {
+    transform: translateY(1px) scale(0.98) rotate(345deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(360deg);
+  }
+}
+
 /* Footer */
+
 .footer {
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   background: var(--navy);
@@ -1253,15 +1368,8 @@ mark {
 }
 
 /* Responsive */
+
 @media (max-width: 1080px) {
-  .nav-logo {
-    width: 78px;
-  }
-
-  .club-chip {
-    font-size: 14px;
-  }
-
   .hero-grid {
     grid-template-columns: 0.95fr 1.05fr;
     gap: 4vw;
@@ -1278,8 +1386,13 @@ mark {
     display: none;
   }
 
-  .nav-logo {
-    width: 72px;
+  .brand-rotary-word {
+    font-size: 14px;
+  }
+
+  .nav-wheel {
+    width: 28px;
+    height: 28px;
   }
 
   .club-chip {
@@ -1369,11 +1482,17 @@ mark {
   }
 
   .nav-brand {
-    gap: 8px;
+    gap: 6px;
   }
 
-  .nav-logo {
-    width: 64px;
+  .brand-rotary-word {
+    font-size: 13px;
+  }
+
+  .nav-wheel {
+    width: 25px;
+    height: 25px;
+    margin-right: 2px;
   }
 
   .club-chip {
@@ -1446,51 +1565,5 @@ mark {
 
   .hero-separator {
     transform: none !important;
-  }
-}
-
-:where(.rotary-wordmark, .rotary-wheel-icon, .rotary-wheel-outline, .card-icon, .success-brand) {
-  transform-origin: center;
-  transform-box: fill-box;
-  will-change: transform;
-}
-
-:where(.rotary-wordmark, .rotary-wheel-icon, .rotary-wheel-outline, .card-icon, .success-brand):hover {
-  animation: rotary-logo-hover-rotate 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-:where(.rotary-wordmark, .rotary-wheel-icon, .rotary-wheel-outline, .card-icon, .success-brand).logo-clicked {
-  animation: rotary-logo-click-bounce 0.68s cubic-bezier(0.2, 0.9, 0.28, 1.25) both !important;
-}
-
-@keyframes rotary-logo-hover-rotate {
-  from {
-    transform: rotate(0deg) scale(1);
-  }
-
-  to {
-    transform: rotate(360deg) scale(1.04);
-  }
-}
-
-@keyframes rotary-logo-click-bounce {
-  0% {
-    transform: rotate(0deg) scale(1);
-  }
-
-  28% {
-    transform: rotate(-10deg) scale(0.88);
-  }
-
-  58% {
-    transform: rotate(16deg) scale(1.16);
-  }
-
-  78% {
-    transform: rotate(340deg) scale(0.97);
-  }
-
-  100% {
-    transform: rotate(360deg) scale(1);
   }
 }
