@@ -12,6 +12,8 @@ import {
   useState,
 } from 'react';
 
+import type { Submission, registrationResponse as RegistrationResponse } from './lib/definitions';
+
 const NON_MEMBER = "I'm not a Rotarian / Non-member";
 
 const ROTARY_BLUE_PATH =
@@ -148,21 +150,13 @@ const purposeOptions = [
   },
 ];
 
-type Submission = {
-  fullName: string;
-  phone: string;
-  email: string;
-  rotaryClub: string;
-  classification: string;
-  purpose: string;
-  otherPurpose: string;
-  event: string;
-  date: string;
-  venue: string;
-  submittedAt: string;
-};
-
 type Errors = Partial<Record<'fullName' | 'rotaryClub' | 'purpose' | 'otherPurpose', string>>;
+
+type FormNotice = {
+  type: 'error' | 'info';
+  title: string;
+  message: string;
+};
 
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -213,6 +207,39 @@ function highlightMatch(text: string, query: string) {
   );
 }
 
+function formatUgandanPhone(value: string) {
+  const digits = value.replace(/\D/g, '').replace(/^256/, '').replace(/^0+/, '');
+  return digits ? `+256${digits}` : '';
+}
+
+function getFriendlySubmitError(response?: (RegistrationResponse & { code?: string }) | null): FormNotice {
+  if (response?.code === 'DUPLICATE') {
+    return {
+      type: 'error',
+      title: 'You may already be registered',
+      message:
+        response.message ||
+        'It looks like this guest may already be registered. Please check with the registration desk if you need help.',
+    };
+  }
+
+  if (response?.code === 'VALIDATION') {
+    return {
+      type: 'error',
+      title: 'Please check the form',
+      message: response.message || 'Some required details are missing.',
+    };
+  }
+
+  return {
+    type: 'error',
+    title: 'Registration could not be completed',
+    message:
+      response?.message ||
+      'Please try again in a moment. If this continues, speak to the registration desk.',
+  };
+}
+
 export default function Page() {
   const formCardRef = useRef<HTMLDivElement | null>(null);
   const userScrolledRef = useRef(false);
@@ -235,6 +262,8 @@ export default function Page() {
   const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<Submission | null>(null);
+  const [notice, setNotice] = useState<FormNotice | null>(null);
+  const [honeypot, setHoneypot] = useState('');
 
   const isNonMember = selectedClub === NON_MEMBER;
 
@@ -394,6 +423,7 @@ export default function Page() {
     setSelectedClub(club);
     setClubQuery(club === NON_MEMBER ? '' : club);
     setClubOpen(false);
+    setNotice(null);
     setErrors((current) => ({ ...current, rotaryClub: undefined }));
   }
 
@@ -413,16 +443,25 @@ export default function Page() {
     return Object.keys(nextErrors).length === 0;
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!validateForm()) return;
+    setNotice(null);
+
+    if (!validateForm()) {
+      setNotice({
+        type: 'error',
+        title: 'A few details are missing',
+        message: 'Please check the highlighted fields before submitting.',
+      });
+      return;
+    }
 
     setLoading(true);
 
     const submission: Submission = {
       fullName: fullName.trim(),
-      phone: phone.trim() ? `+256${phone.trim().replace(/^0+/, '')}` : '',
+      phone: formatUgandanPhone(phone),
       email: email.trim(),
       rotaryClub: selectedClub,
       classification,
@@ -434,11 +473,42 @@ export default function Page() {
       submittedAt: new Date().toISOString(),
     };
 
-    window.setTimeout(() => {
-      console.log(JSON.stringify(submission, null, 2));
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          ...submission,
+          honeypot,
+        }),
+      });
+
+      let data: (RegistrationResponse & { code?: string }) | null = null;
+
+      try {
+        data = (await response.json()) as RegistrationResponse & { code?: string };
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok || !data?.success) {
+        setNotice(getFriendlySubmitError(data));
+        return;
+      }
+
       setSuccess(submission);
+    } catch {
+      setNotice({
+        type: 'error',
+        title: 'Connection problem',
+        message: 'We could not send the registration. Please check your connection and try again.',
+      });
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   }
 
   function resetForm() {
@@ -452,6 +522,8 @@ export default function Page() {
     setPurpose('Installation');
     setOtherPurpose('');
     setErrors({});
+    setNotice(null);
+    setHoneypot('');
     setSuccess(null);
   }
 
@@ -521,6 +593,8 @@ export default function Page() {
           >
             <RegistrationCard
               success={success}
+              notice={notice}
+              honeypot={honeypot}
               fullName={fullName}
               phone={phone}
               email={email}
@@ -536,6 +610,7 @@ export default function Page() {
               isNonMember={isNonMember}
               onSubmit={handleSubmit}
               onReset={resetForm}
+              setHoneypot={setHoneypot}
               setFullName={setFullName}
               setPhone={setPhone}
               setEmail={setEmail}
@@ -547,6 +622,7 @@ export default function Page() {
               setPurpose={setPurpose}
               setOtherPurpose={setOtherPurpose}
               setErrors={setErrors}
+              setNotice={setNotice}
             />
           </div>
         </div>
@@ -559,6 +635,8 @@ export default function Page() {
 
 function RegistrationCard({
   success,
+  notice,
+  honeypot,
   fullName,
   phone,
   email,
@@ -574,6 +652,7 @@ function RegistrationCard({
   isNonMember,
   onSubmit,
   onReset,
+  setHoneypot,
   setFullName,
   setPhone,
   setEmail,
@@ -585,8 +664,11 @@ function RegistrationCard({
   setPurpose,
   setOtherPurpose,
   setErrors,
+  setNotice,
 }: {
   success: Submission | null;
+  notice: FormNotice | null;
+  honeypot: string;
   fullName: string;
   phone: string;
   email: string;
@@ -602,6 +684,7 @@ function RegistrationCard({
   isNonMember: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
+  setHoneypot: (value: string) => void;
   setFullName: (value: string) => void;
   setPhone: (value: string) => void;
   setEmail: (value: string) => void;
@@ -613,6 +696,7 @@ function RegistrationCard({
   setPurpose: (value: string) => void;
   setOtherPurpose: (value: string) => void;
   setErrors: Dispatch<SetStateAction<Errors>>;
+  setNotice: Dispatch<SetStateAction<FormNotice | null>>;
 }) {
   if (success) {
     return <SuccessState submission={success} onReset={onReset} />;
@@ -635,12 +719,29 @@ function RegistrationCard({
       <div className="card-divider" />
 
       <form onSubmit={onSubmit} noValidate>
+        <div className="honeypot-field" aria-hidden="true">
+          <label htmlFor="company-name">Company name</label>
+          <input
+            id="company-name"
+            name="companyName"
+            type="text"
+            value={honeypot}
+            onChange={(event) => setHoneypot(event.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+          />
+        </div>
+
         <FloatingInput
           className="field-reveal"
           id="full-name"
           label="Full name"
           value={fullName}
-          onChange={setFullName}
+          onChange={(value) => {
+            setFullName(value);
+            setNotice(null);
+            setErrors((current) => ({ ...current, fullName: undefined }));
+          }}
           icon={<UserIcon />}
           error={errors.fullName}
           autoComplete="name"
@@ -659,7 +760,10 @@ function RegistrationCard({
                 id="phone"
                 type="tel"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
+                onChange={(event) => {
+                  setPhone(event.target.value);
+                  setNotice(null);
+                }}
                 placeholder=" "
                 inputMode="tel"
                 autoComplete="tel"
@@ -676,7 +780,10 @@ function RegistrationCard({
           id="email"
           label="Email address"
           value={email}
-          onChange={setEmail}
+          onChange={(value) => {
+            setEmail(value);
+            setNotice(null);
+          }}
           icon={<MailIcon />}
           helper="Optional — we'll only use this to follow up"
           type="email"
@@ -698,6 +805,7 @@ function RegistrationCard({
                   setClubQuery(event.target.value);
                   setSelectedClub('');
                   setClubOpen(true);
+                  setNotice(null);
                 }}
                 placeholder=" "
                 aria-invalid={Boolean(errors.rotaryClub)}
@@ -749,6 +857,7 @@ function RegistrationCard({
               onClick={() => {
                 setSelectedClub('');
                 setClubQuery('');
+                setNotice(null);
               }}
             >
               Change
@@ -765,7 +874,10 @@ function RegistrationCard({
                 key={item}
                 type="button"
                 className={`chip ${classification === item ? 'selected' : ''}`}
-                onClick={() => setClassification(item)}
+                onClick={() => {
+                  setClassification(item);
+                  setNotice(null);
+                }}
               >
                 {classification === item && <i />}
                 {item}
@@ -785,7 +897,8 @@ function RegistrationCard({
                 className={`purpose-card ${purpose === item.key ? 'selected' : ''}`}
                 onClick={() => {
                   setPurpose(item.key);
-                  setErrors((current) => ({ ...current, purpose: undefined }));
+                  setNotice(null);
+                  setErrors((current) => ({ ...current, purpose: undefined, otherPurpose: undefined }));
                 }}
               >
                 <span className="purpose-icon">{item.icon}</span>
@@ -800,7 +913,11 @@ function RegistrationCard({
           <div className={`other-field ${purpose === 'Other' ? 'show' : ''}`}>
             <textarea
               value={otherPurpose}
-              onChange={(event) => setOtherPurpose(event.target.value)}
+              onChange={(event) => {
+                setOtherPurpose(event.target.value);
+                setNotice(null);
+                setErrors((current) => ({ ...current, otherPurpose: undefined }));
+              }}
               placeholder="Describe your purpose..."
               rows={3}
             />
@@ -809,8 +926,15 @@ function RegistrationCard({
           </div>
         </div>
 
+        {notice && (
+          <div className={`form-notice ${notice.type}`} role={notice.type === 'error' ? 'alert' : 'status'}>
+            <strong>{notice.title}</strong>
+            <span>{notice.message}</span>
+          </div>
+        )}
+
         <button className={`submit-button ${loading ? 'loading' : ''}`} type="submit" disabled={loading}>
-          <span>Complete Registration</span>
+          <span>{loading ? 'Submitting...' : 'Complete Registration'}</span>
           <i aria-hidden="true" />
         </button>
       </form>
