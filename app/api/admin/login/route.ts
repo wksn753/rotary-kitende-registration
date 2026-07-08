@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   ADMIN_COOKIE_NAME,
   createAdminSessionValue,
@@ -8,26 +8,39 @@ import {
 } from '../../../lib/admin-auth';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type LoginPayload = {
   password?: string;
 };
 
-function getCookieValue(cookieHeader: string | null, name: string) {
-  return cookieHeader
-    ?.split(';')
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(`${name}=`))
-    ?.split('=')[1];
+function noStore(response: NextResponse) {
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('Expires', '0');
+  return response;
 }
 
-export async function GET(request: Request) {
-  const session = getCookieValue(request.headers.get('cookie'), ADMIN_COOKIE_NAME);
+function shouldUseSecureCookie(request: NextRequest) {
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase();
 
-  return NextResponse.json({ authenticated: isValidAdminSession(session) }, { status: 200 });
+  if (forwardedProto) return forwardedProto === 'https';
+
+  try {
+    return new URL(request.url).protocol === 'https:';
+  } catch {
+    return process.env.NODE_ENV === 'production';
+  }
 }
 
-export async function POST(request: Request) {
+export async function GET(request: NextRequest) {
+  const session = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+
+  return noStore(NextResponse.json({ authenticated: isValidAdminSession(session) }, { status: 200 }));
+}
+
+export async function POST(request: NextRequest) {
   let payload: LoginPayload | null = null;
 
   try {
@@ -37,17 +50,17 @@ export async function POST(request: Request) {
   }
 
   if (!payload?.password || !isCorrectAdminPassword(payload.password)) {
-    return NextResponse.json({ success: false, message: 'Invalid admin password.' }, { status: 401 });
+    return noStore(NextResponse.json({ success: false, message: 'Invalid admin password.' }, { status: 401 }));
   }
 
-  const response = NextResponse.json({ success: true, message: 'Admin session started.' }, { status: 200 });
+  const response = noStore(NextResponse.json({ success: true, message: 'Admin session started.' }, { status: 200 }));
 
   response.cookies.set({
     name: ADMIN_COOKIE_NAME,
     value: createAdminSessionValue(),
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: shouldUseSecureCookie(request),
     path: '/',
     maxAge: getAdminSessionMaxAgeSeconds(),
   });

@@ -41,6 +41,15 @@ ADMIN_API_KEY=change-this-shared-backend-admin-key
 
 `ADMIN_API_KEY` should match the Go backend `ADMIN_API_KEY` if you enable direct backend protection for `/api/attendance`.
 
+
+## Admin session fix notes
+
+This version fixes immediate logout after sign-in by setting the admin cookie based on the actual request protocol instead of blindly forcing `Secure` whenever `NODE_ENV=production`. That matters when the production build is tested over plain HTTP or behind a proxy.
+
+It also forces dynamic/no-store handling for admin pages and admin API routes so cached redirects do not send a valid session back to `/admin/login`.
+
+The `Permissions-Policy: browsing-topics` browser warning is not an auth error. A `next.config.js` header override is included to avoid emitting that unsupported directive from the app.
+
 ## Admin
 
 Open `/admin`. Unauthenticated users are redirected to `/admin/login`.

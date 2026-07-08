@@ -152,6 +152,7 @@ export default function AdminAttendanceClient() {
     try {
       const response = await fetch(`/api/admin/attendance?date=${encodeURIComponent(selectedDate)}`, {
         headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
         cache: 'no-store',
       });
 
@@ -185,7 +186,7 @@ export default function AdminAttendanceClient() {
   }
 
   async function logout() {
-    await fetch('/api/admin/logout', { method: 'POST' }).catch(() => null);
+    await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
     window.location.href = '/admin/login';
   }
 

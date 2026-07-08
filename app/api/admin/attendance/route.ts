@@ -1,15 +1,20 @@
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import type { AttendanceResponse } from '../../../lib/definitions';
 import { ADMIN_COOKIE_NAME, isValidAdminSession } from '../../../lib/admin-auth';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const FALLBACK_ATTENDANCE_URL =
   'http://n1065v34z9435876yrwcc9mx.213.136.66.81.sslip.io/api/attendance';
 
 function jsonResponse(payload: AttendanceResponse, status: number) {
-  return NextResponse.json(payload, { status });
+  const response = NextResponse.json(payload, { status });
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('Expires', '0');
+  return response;
 }
 
 function getBackendAttendanceURL() {
@@ -22,8 +27,8 @@ function getBackendAttendanceURL() {
   );
 }
 
-export async function GET(request: Request) {
-  const session = cookies().get(ADMIN_COOKIE_NAME)?.value;
+export async function GET(request: NextRequest) {
+  const session = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
 
   if (!isValidAdminSession(session)) {
     return jsonResponse({ success: false, code: 'UNAUTHORIZED', message: 'Admin login required.' }, 401);
