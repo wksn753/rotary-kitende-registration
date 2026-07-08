@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { AttendanceResponse } from '../../../lib/definitions';
-import { ADMIN_COOKIE_NAME, isValidAdminSession } from '../../../lib/admin-auth';
+import { ADMIN_COOKIE_NAME, getBearerAdminSession, isValidAdminSession } from '../../../lib/admin-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,7 @@ function jsonResponse(payload: AttendanceResponse, status: number) {
   response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.headers.set('Pragma', 'no-cache');
   response.headers.set('Expires', '0');
+  response.headers.set('Vary', 'Cookie, Authorization');
   return response;
 }
 
@@ -27,8 +28,15 @@ function getBackendAttendanceURL() {
   );
 }
 
+function getRequestSession(request: NextRequest) {
+  return (
+    request.cookies.get(ADMIN_COOKIE_NAME)?.value ||
+    getBearerAdminSession(request.headers.get('authorization'))
+  );
+}
+
 export async function GET(request: NextRequest) {
-  const session = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  const session = getRequestSession(request);
 
   if (!isValidAdminSession(session)) {
     return jsonResponse({ success: false, code: 'UNAUTHORIZED', message: 'Admin login required.' }, 401);

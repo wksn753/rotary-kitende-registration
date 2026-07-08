@@ -7,7 +7,7 @@ Next.js registration frontend for weekly fellowship and event check-ins.
 - First-time guest registration.
 - Returning guest lookup by email or phone.
 - Daily attendance admin dashboard.
-- Admin password protection with an HttpOnly signed session cookie.
+- Admin password protection with an HttpOnly signed session cookie plus a signed session-token fallback for hosts that reject cookies.
 - Attendance search by name, phone, email, club, classification, purpose, or event.
 - Paginated admin tables with mobile attendance cards.
 - CSV export for the selected date and current search filter.
@@ -44,12 +44,22 @@ ADMIN_API_KEY=change-this-shared-backend-admin-key
 
 ## Admin session fix notes
 
-This version fixes immediate logout after sign-in by setting the admin cookie based on the actual request protocol instead of blindly forcing `Secure` whenever `NODE_ENV=production`. That matters when the production build is tested over plain HTTP or behind a proxy.
+This version fixes immediate logout after sign-in more defensively. The login API still sets the signed HttpOnly cookie, but it also returns the same signed session token to the browser as a fallback. The admin dashboard sends that token as a Bearer token when loading protected admin API data.
 
-It also forces dynamic/no-store handling for admin pages and admin API routes so cached redirects do not send a valid session back to `/admin/login`.
+That means the admin stays logged in even when a hosting proxy, preview URL, browser policy, or HTTP/HTTPS mismatch rejects the cookie. Protected attendance data still requires a valid signed session, either from the cookie or the Bearer token.
+
+Optional cookie control:
+
+```bash
+# Force Secure cookies only when you are sure the site is always HTTPS.
+ADMIN_COOKIE_SECURE=true
+
+# Force non-Secure cookies for HTTP/proxy testing.
+ADMIN_COOKIE_SECURE=false
+```
 
 The `Permissions-Policy: browsing-topics` browser warning is not an auth error. A `next.config.js` header override is included to avoid emitting that unsupported directive from the app.
 
 ## Admin
 
-Open `/admin`. Unauthenticated users are redirected to `/admin/login`.
+Open `/admin`. Unauthenticated users are sent to `/admin/login`; attendance data is only loaded after a valid admin session is present.

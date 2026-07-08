@@ -1,12 +1,53 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
+
+const ADMIN_SESSION_STORAGE_KEY = 'kitendeAdminSession';
+
+function getStoredAdminToken() {
+  if (typeof window === 'undefined') return '';
+
+  try {
+    return window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function storeAdminToken(token?: string) {
+  if (!token || typeof window === 'undefined') return;
+
+  try {
+    window.sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token);
+  } catch {
+    // The HttpOnly cookie may still work if browser storage is unavailable.
+  }
+}
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const token = getStoredAdminToken();
+
+    void fetch('/api/admin/login', {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
+      .then((response) => response.json().catch(() => null))
+      .then((data: { authenticated?: boolean } | null) => {
+        if (data?.authenticated) window.location.replace('/admin');
+      })
+      .catch(() => null);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -22,14 +63,15 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ password }),
       });
 
-      const data = (await response.json().catch(() => null)) as { success?: boolean; message?: string } | null;
+      const data = (await response.json().catch(() => null)) as { success?: boolean; message?: string; token?: string } | null;
 
       if (!response.ok || !data?.success) {
         setError(data?.message || 'Login failed.');
         return;
       }
 
-      window.location.href = '/admin';
+      storeAdminToken(data.token);
+      window.location.replace('/admin');
     } catch {
       setError('Could not sign in. Check your connection and try again.');
     } finally {

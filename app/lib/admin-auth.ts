@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 export const ADMIN_COOKIE_NAME = 'kitende_admin_session';
+export const ADMIN_AUTH_HEADER = 'authorization';
 const SESSION_VERSION = 'v1';
 const DEFAULT_SESSION_HOURS = 8;
 
@@ -42,6 +43,16 @@ export function createAdminSessionValue() {
 
 export function getAdminSessionMaxAgeSeconds() {
   return getSessionHours() * 60 * 60;
+}
+
+export function getBearerAdminSession(authorizationHeader?: string | null) {
+  if (!authorizationHeader) return '';
+
+  const [scheme, token] = authorizationHeader.trim().split(/\s+/, 2);
+
+  if (scheme?.toLowerCase() !== 'bearer' || !token) return '';
+
+  return token.trim();
 }
 
 export function isValidAdminSession(value?: string | null) {

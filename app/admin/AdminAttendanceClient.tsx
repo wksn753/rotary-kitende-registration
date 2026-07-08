@@ -6,6 +6,34 @@ import Link from 'next/link';
 import type { AttendanceRecord, AttendanceResponse } from '../lib/definitions';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const ADMIN_SESSION_STORAGE_KEY = 'kitendeAdminSession';
+
+
+function getStoredAdminToken() {
+  if (typeof window === 'undefined') return '';
+
+  try {
+    return window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function clearStoredAdminToken() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+  } catch {
+    // Nothing else to clear if storage is blocked.
+  }
+}
+
+function getAdminAuthHeaders() {
+  const token = getStoredAdminToken();
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 function todayInKampalaISO() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -151,13 +179,14 @@ export default function AdminAttendanceClient() {
 
     try {
       const response = await fetch(`/api/admin/attendance?date=${encodeURIComponent(selectedDate)}`, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', ...getAdminAuthHeaders() },
         credentials: 'same-origin',
         cache: 'no-store',
       });
 
       if (response.status === 401) {
-        window.location.href = '/admin/login';
+        clearStoredAdminToken();
+        window.location.replace('/admin/login');
         return;
       }
 
@@ -186,8 +215,14 @@ export default function AdminAttendanceClient() {
   }
 
   async function logout() {
-    await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
-    window.location.href = '/admin/login';
+    clearStoredAdminToken();
+    await fetch('/api/admin/logout', {
+      method: 'POST',
+      headers: { ...getAdminAuthHeaders() },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    }).catch(() => null);
+    window.location.replace('/admin/login');
   }
 
   function downloadCSV() {
