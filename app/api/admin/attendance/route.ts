@@ -1,5 +1,7 @@
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { AttendanceResponse } from '../../../lib/definitions';
+import { ADMIN_COOKIE_NAME, isValidAdminSession } from '../../../lib/admin-auth';
 
 export const runtime = 'nodejs';
 
@@ -10,15 +12,28 @@ function jsonResponse(payload: AttendanceResponse, status: number) {
   return NextResponse.json(payload, { status });
 }
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const date = url.searchParams.get('date')?.trim() || '';
+function getBackendAttendanceURL() {
   const registerUrl = process.env.REGISTRATION_API_URL?.trim();
-  const backendUrl =
+
+  return (
     process.env.REGISTRATION_ATTENDANCE_API_URL?.trim() ||
     (registerUrl?.endsWith('/register') ? registerUrl.replace(/\/register$/, '/attendance') : '') ||
-    FALLBACK_ATTENDANCE_URL;
+    FALLBACK_ATTENDANCE_URL
+  );
+}
+
+export async function GET(request: Request) {
+  const session = cookies().get(ADMIN_COOKIE_NAME)?.value;
+
+  if (!isValidAdminSession(session)) {
+    return jsonResponse({ success: false, code: 'UNAUTHORIZED', message: 'Admin login required.' }, 401);
+  }
+
+  const url = new URL(request.url);
+  const date = url.searchParams.get('date')?.trim() || '';
+  const backendUrl = getBackendAttendanceURL();
   const target = date ? `${backendUrl}?date=${encodeURIComponent(date)}` : backendUrl;
+  const adminAPIKey = process.env.ADMIN_API_KEY?.trim();
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
@@ -26,7 +41,10 @@ export async function GET(request: Request) {
   try {
     const backendResponse = await fetch(target, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        ...(adminAPIKey ? { 'X-Admin-API-Key': adminAPIKey } : {}),
+      },
       signal: controller.signal,
       cache: 'no-store',
     });
@@ -47,7 +65,7 @@ export async function GET(request: Request) {
           code: data?.code || 'UNAVAILABLE',
           message: data?.message || 'Attendance is temporarily unavailable.',
         },
-        502,
+        backendResponse.status === 401 || backendResponse.status === 403 ? backendResponse.status : 502,
       );
     }
 
