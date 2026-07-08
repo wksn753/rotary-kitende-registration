@@ -47,6 +47,11 @@ export async function GET(request: NextRequest) {
   const backendUrl = getBackendAttendanceURL();
   const target = date ? `${backendUrl}?date=${encodeURIComponent(date)}` : backendUrl;
   const adminAPIKey = process.env.ADMIN_API_KEY?.trim();
+  const headers: Record<string, string> = { Accept: 'application/json' };
+
+  if (adminAPIKey) {
+    headers['X-Admin-API-Key'] = adminAPIKey;
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
@@ -54,10 +59,7 @@ export async function GET(request: NextRequest) {
   try {
     const backendResponse = await fetch(target, {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(adminAPIKey ? { 'X-Admin-API-Key': adminAPIKey } : {}),
-      },
+      headers,
       signal: controller.signal,
       cache: 'no-store',
     });

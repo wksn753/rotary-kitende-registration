@@ -29,10 +29,12 @@ function clearStoredAdminToken() {
   }
 }
 
-function getAdminAuthHeaders() {
+function getAdminAuthHeaders(): Record<string, string> {
   const token = getStoredAdminToken();
 
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (!token) return {};
+
+  return { Authorization: `Bearer ${token}` };
 }
 
 function todayInKampalaISO() {
@@ -178,8 +180,13 @@ export default function AdminAttendanceClient() {
     setError('');
 
     try {
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+        ...getAdminAuthHeaders(),
+      };
+
       const response = await fetch(`/api/admin/attendance?date=${encodeURIComponent(selectedDate)}`, {
-        headers: { Accept: 'application/json', ...getAdminAuthHeaders() },
+        headers,
         credentials: 'same-origin',
         cache: 'no-store',
       });
@@ -215,13 +222,16 @@ export default function AdminAttendanceClient() {
   }
 
   async function logout() {
-    clearStoredAdminToken();
+    const headers: Record<string, string> = getAdminAuthHeaders();
+
     await fetch('/api/admin/logout', {
       method: 'POST',
-      headers: { ...getAdminAuthHeaders() },
+      headers,
       credentials: 'same-origin',
       cache: 'no-store',
     }).catch(() => null);
+
+    clearStoredAdminToken();
     window.location.replace('/admin/login');
   }
 

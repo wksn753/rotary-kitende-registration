@@ -32,13 +32,15 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     const token = getStoredAdminToken();
+    const headers: Record<string, string> = { Accept: 'application/json' };
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
 
     void fetch('/api/admin/login', {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers,
       credentials: 'same-origin',
       cache: 'no-store',
     })
