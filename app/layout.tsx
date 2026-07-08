@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Rotary Club of Kitende Breeze | Guest Registration',
+  title: 'Rotary Club of Kitende Breeze | Fellowship Check-In',
   description:
-    'Door registration for the Rotary Club of Kitende Breeze Presidential Installation ceremony.',
+    'Fast fellowship and event attendance check-in for Rotary Club of Kitende Breeze.',
   icons: {
     icon: [
       {

@@ -12,7 +12,7 @@ import {
   useState,
 } from 'react';
 
-import type { Submission, registrationResponse as RegistrationResponse } from './lib/definitions';
+import type { LookupResponse, Submission, registrationResponse as RegistrationResponse } from './lib/definitions';
 
 const NON_MEMBER = "I'm not a Rotarian / Non-member";
 
@@ -208,18 +208,53 @@ function highlightMatch(text: string, query: string) {
 }
 
 function formatUgandanPhone(value: string) {
-  const digits = value.replace(/\D/g, '').replace(/^256/, '').replace(/^0+/, '');
+  const digits = value.replace(/\D/g, '').replace(/^00/, '').replace(/^256/, '').replace(/^0+/, '');
   return digits ? `+256${digits}` : '';
+}
+
+function todayInKampalaISO() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Kampala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === 'year')?.value || '';
+  const month = parts.find((part) => part.type === 'month')?.value || '';
+  const day = parts.find((part) => part.type === 'day')?.value || '';
+
+  return `${year}-${month}-${day}`;
+}
+
+function displayDate(value: string) {
+  const parsed = new Date(`${value}T12:00:00+03:00`);
+
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return new Intl.DateTimeFormat('en-UG', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(parsed);
+}
+
+function eventNameForPurpose(value: string) {
+  if (value === 'Club Fellowship') return 'Rotary Club of Kitende Breeze Thursday Fellowship';
+  if (value === 'Installation') return 'Rotary Club of Kitende Breeze Presidential Installation';
+  if (value === 'Service Project') return 'Rotary Club of Kitende Breeze Service Project';
+  return 'Rotary Club of Kitende Breeze Event';
 }
 
 function getFriendlySubmitError(response?: (RegistrationResponse & { code?: string }) | null): FormNotice {
   if (response?.code === 'DUPLICATE') {
     return {
       type: 'error',
-      title: 'You may already be registered',
+      title: 'Already checked in',
       message:
         response.message ||
-        'It looks like this guest may already be registered. Please check with the registration desk if you need help.',
+        'This guest is already checked in for this selected day/event.',
     };
   }
 
@@ -257,13 +292,15 @@ export default function Page() {
   const [selectedClub, setSelectedClub] = useState('');
   const [clubOpen, setClubOpen] = useState(false);
   const [classification, setClassification] = useState('');
-  const [purpose, setPurpose] = useState('Installation');
+  const [purpose, setPurpose] = useState('Club Fellowship');
   const [otherPurpose, setOtherPurpose] = useState('');
   const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<Submission | null>(null);
   const [notice, setNotice] = useState<FormNotice | null>(null);
   const [honeypot, setHoneypot] = useState('');
+  const [lookupContact, setLookupContact] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   const isNonMember = selectedClub === NON_MEMBER;
 
@@ -427,10 +464,80 @@ export default function Page() {
     setErrors((current) => ({ ...current, rotaryClub: undefined }));
   }
 
+
+  async function lookupReturningVisitor() {
+    const query = lookupContact.trim();
+
+    setNotice(null);
+
+    if (!query) {
+      setNotice({
+        type: 'error',
+        title: 'Enter contact first',
+        message: 'Returning guests can use either their email address or phone number.',
+      });
+      return;
+    }
+
+    setLookupLoading(true);
+
+    try {
+      const response = await fetch('/api/lookup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      let data: LookupResponse | null = null;
+
+      try {
+        data = (await response.json()) as LookupResponse;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok || !data?.success || !data.visitor) {
+        setNotice({
+          type: 'info',
+          title: 'New guest',
+          message: data?.message || 'No saved record was found. Please complete the details once.',
+        });
+        return;
+      }
+
+      const visitor = data.visitor;
+      setFullName(visitor.fullName || '');
+      setEmail(visitor.email || '');
+      setPhone(visitor.phone || '');
+      setClassification(visitor.classification || '');
+      setSelectedClub(visitor.rotaryClub || '');
+      setClubQuery(visitor.rotaryClub && visitor.rotaryClub !== NON_MEMBER ? visitor.rotaryClub : '');
+      setClubOpen(false);
+      setErrors({});
+      setNotice({
+        type: 'info',
+        title: 'Welcome back',
+        message: `${visitor.fullName}'s details have been restored. Confirm today's visit to check in.`,
+      });
+    } catch {
+      setNotice({
+        type: 'error',
+        title: 'Lookup unavailable',
+        message: 'We could not retrieve the saved record right now. You can still complete the form manually.',
+      });
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
   function validateForm() {
     const nextErrors: Errors = {};
 
     if (!fullName.trim()) nextErrors.fullName = 'Full name is required.';
+    if (!phone.trim() && !email.trim()) nextErrors.fullName = 'Enter phone or email so future fellowship check-ins are quick.';
     if (!selectedClub) nextErrors.rotaryClub = 'Select your Rotary club or choose non-member.';
     if (!purpose) nextErrors.purpose = 'Select a purpose of visit.';
 
@@ -459,18 +566,22 @@ export default function Page() {
 
     setLoading(true);
 
+    const attendanceDate = todayInKampalaISO();
+
     const submission: Submission = {
       fullName: fullName.trim(),
       phone: formatUgandanPhone(phone),
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       rotaryClub: selectedClub,
       classification,
       purpose,
       otherPurpose: purpose === 'Other' ? otherPurpose.trim() : '',
-      event: 'Rotary Club of Kitende Breeze Presidential Installation',
-      date: '4th July 2026',
-      venue: 'Nican Resort, Kampala Uganda',
+      event: eventNameForPurpose(purpose),
+      date: attendanceDate,
+      attendanceDate,
+      venue: purpose === 'Installation' ? 'Nican Resort, Kampala Uganda' : 'Rotary Club of Kitende Breeze',
       submittedAt: new Date().toISOString(),
+      checkInSource: 'web',
     };
 
     try {
@@ -499,6 +610,14 @@ export default function Page() {
         return;
       }
 
+      if (data.alreadyRegistered) {
+        setNotice({
+          type: 'info',
+          title: 'Already checked in',
+          message: data.message || 'This visitor was already checked in for today.',
+        });
+      }
+
       setSuccess(submission);
     } catch {
       setNotice({
@@ -519,11 +638,12 @@ export default function Page() {
     setSelectedClub('');
     setClubOpen(false);
     setClassification('');
-    setPurpose('Installation');
+    setPurpose('Club Fellowship');
     setOtherPurpose('');
     setErrors({});
     setNotice(null);
     setHoneypot('');
+    setLookupContact('');
     setSuccess(null);
   }
 
@@ -557,7 +677,7 @@ export default function Page() {
         <div className="hero-grid">
           <div className="hero-copy">
             <div className="hero-item hero-badge-wrap" style={{ '--delay': '0ms' } as CSSProperties}>
-              <span className="hero-badge">PRESIDENTIAL INSTALLATION CEREMONY</span>
+              <span className="hero-badge">FELLOWSHIP & EVENT CHECK-IN</span>
             </div>
 
             <h1 className="hero-title hero-item" style={{ '--delay': '150ms' } as CSSProperties}>
@@ -569,20 +689,19 @@ export default function Page() {
 
             <div className="hero-meta hero-item" style={{ '--delay': '380ms' } as CSSProperties}>
               <p>
-                <strong>President-Elect Richard Mujjuzi</strong>
+                <strong>Weekly fellowship, events and guest attendance</strong>
               </p>
               <p>
-                Presidential Installation <span>·</span> 4th July 2026 <span>·</span> Nican Resort,
-                Kampala
+                Thursday Fellowship <span>·</span> Returning guest lookup <span>·</span> Kitende Breeze
               </p>
             </div>
 
             <div className="hero-action hero-item" style={{ '--delay': '500ms' } as CSSProperties}>
               <button type="button" onClick={scrollToForm}>
-                Register Now
+                Check In
                 <ArrowRightIcon />
               </button>
-              <small>Takes less than 60 seconds</small>
+              <small>Returning guests only need email or phone</small>
             </div>
           </div>
 
@@ -606,11 +725,15 @@ export default function Page() {
               otherPurpose={otherPurpose}
               errors={errors}
               loading={loading}
+              lookupContact={lookupContact}
+              lookupLoading={lookupLoading}
               filteredClubs={filteredClubs}
               isNonMember={isNonMember}
               onSubmit={handleSubmit}
               onReset={resetForm}
+              onLookupReturningVisitor={lookupReturningVisitor}
               setHoneypot={setHoneypot}
+              setLookupContact={setLookupContact}
               setFullName={setFullName}
               setPhone={setPhone}
               setEmail={setEmail}
@@ -648,11 +771,15 @@ function RegistrationCard({
   otherPurpose,
   errors,
   loading,
+  lookupContact,
+  lookupLoading,
   filteredClubs,
   isNonMember,
   onSubmit,
   onReset,
+  onLookupReturningVisitor,
   setHoneypot,
+  setLookupContact,
   setFullName,
   setPhone,
   setEmail,
@@ -680,11 +807,15 @@ function RegistrationCard({
   otherPurpose: string;
   errors: Errors;
   loading: boolean;
+  lookupContact: string;
+  lookupLoading: boolean;
   filteredClubs: string[];
   isNonMember: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
+  onLookupReturningVisitor: () => void;
   setHoneypot: (value: string) => void;
+  setLookupContact: (value: string) => void;
   setFullName: (value: string) => void;
   setPhone: (value: string) => void;
   setEmail: (value: string) => void;
@@ -710,13 +841,37 @@ function RegistrationCard({
         </div>
 
         <div>
-          <p>DOOR REGISTRATION</p>
-          <h2>Guest Registration</h2>
-          <span>Visiting Rotarian? We&apos;re glad you&apos;re here.</span>
+          <p>FAST CHECK-IN</p>
+          <h2>Fellowship Attendance</h2>
+          <span>Returning guests can restore details with email or phone.</span>
         </div>
       </header>
 
       <div className="card-divider" />
+
+
+      <div className="returning-lookup field-reveal">
+        <div>
+          <strong>Returning guest?</strong>
+          <span>Enter email or phone, then confirm today's fellowship/event.</span>
+        </div>
+
+        <div className="lookup-row">
+          <input
+            type="text"
+            value={lookupContact}
+            onChange={(event) => {
+              setLookupContact(event.target.value);
+              setNotice(null);
+            }}
+            placeholder="Email or phone number"
+            autoComplete="email tel"
+          />
+          <button type="button" onClick={onLookupReturningVisitor} disabled={lookupLoading}>
+            {lookupLoading ? 'Finding...' : 'Find'}
+          </button>
+        </div>
+      </div>
 
       <form onSubmit={onSubmit} noValidate>
         <div className="honeypot-field" aria-hidden="true">
@@ -772,7 +927,7 @@ function RegistrationCard({
             </label>
           </div>
 
-          <p className="helper-text">Optional — for event follow-up only</p>
+          <p className="helper-text">Recommended — makes next Thursday a one-step check-in</p>
         </div>
 
         <FloatingInput
@@ -785,7 +940,7 @@ function RegistrationCard({
             setNotice(null);
           }}
           icon={<MailIcon />}
-          helper="Optional — we'll only use this to follow up"
+          helper="Recommended — use email or phone for returning lookup"
           type="email"
           autoComplete="email"
         />
@@ -934,7 +1089,7 @@ function RegistrationCard({
         )}
 
         <button className={`submit-button ${loading ? 'loading' : ''}`} type="submit" disabled={loading}>
-          <span>{loading ? 'Submitting...' : 'Complete Registration'}</span>
+          <span>{loading ? 'Checking in...' : 'Complete Check-In'}</span>
           <i aria-hidden="true" />
         </button>
       </form>
@@ -960,13 +1115,13 @@ function SuccessState({
         <path d="M24 37.5 32.5 46 50 27" />
       </svg>
 
-      <h2>You&apos;re Registered</h2>
+      <h2>Check-in Complete</h2>
       <p>{submission.fullName}</p>
 
-      <div className="success-event">4th July 2026 · Nican Resort, Kampala</div>
+      <div className="success-event">{submission.event} · {displayDate(submission.attendanceDate || submission.date)}</div>
 
       <button type="button" onClick={onReset}>
-        Register another guest
+        Check in another guest
       </button>
     </div>
   );
@@ -1050,7 +1205,7 @@ function SplashScreen() {
         <span>ROTARY CLUB OF</span>
         <h1>Kitende Breeze</h1>
         <i />
-        <p>Presidential Installation · 4th July 2026</p>
+        <p>Fellowship & Event Attendance</p>
       </div>
     </div>
   );
@@ -1071,14 +1226,14 @@ function Nav({ onRegister }: { onRegister: () => void }) {
         </a>
 
         <button type="button" onClick={onRegister}>
-          Register
+          Check In
         </button>
 
-        <a href="#venue">Venue</a>
+        <a href="/admin">Admin</a>
       </div>
 
       <button type="button" className="nav-cta" onClick={onRegister}>
-        Register Now
+        Check In
       </button>
     </nav>
   );
@@ -1090,8 +1245,8 @@ function Footer() {
       <RotaryWordmarkLogo className="footer-logo" />
 
       <h2>Rotary Club of Kitende Breeze</h2>
-      <p>Presidential Installation · President-Elect Richard Mujjuzi · 4th July 2026</p>
-      <p>Nican Resort, Kampala Uganda</p>
+      <p>Weekly Thursday Fellowship · Events · Guest Attendance</p>
+      <p>Returning guests can check in with email or phone.</p>
 
       <a className="footer-powered" href="https://savaralabs.com" target="_blank" rel="noreferrer">
         Powered by Savaralabs

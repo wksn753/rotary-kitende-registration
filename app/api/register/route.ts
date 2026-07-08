@@ -14,6 +14,11 @@ function cleanText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function formatUgandanPhone(value: string) {
+  const digits = value.replace(/\D/g, '').replace(/^00/, '').replace(/^256/, '').replace(/^0+/, '');
+  return digits ? `+256${digits}` : '';
+}
+
 function jsonResponse(payload: RegistrationResponse, status: number) {
   return NextResponse.json(payload, { status });
 }
@@ -49,16 +54,40 @@ export async function POST(request: Request) {
   }
 
   const fullName = cleanText(body.fullName);
+  const phone = formatUgandanPhone(cleanText(body.phone));
+  const email = cleanText(body.email).toLowerCase();
   const rotaryClub = cleanText(body.rotaryClub);
-  const purpose = cleanText(body.purpose);
+  const purpose = cleanText(body.purpose) || 'Club Fellowship';
   const otherPurpose = cleanText(body.otherPurpose);
 
-  if (!fullName || !rotaryClub || !purpose) {
+  if (!fullName) {
     return jsonResponse(
       {
         success: false,
         code: 'VALIDATION',
-        message: 'Please complete the required details and try again.',
+        message: 'Please enter a full name, or use the returning guest lookup first.',
+      },
+      400,
+    );
+  }
+
+  if (!phone && !email) {
+    return jsonResponse(
+      {
+        success: false,
+        code: 'VALIDATION',
+        message: 'Please enter a phone number or email so returning fellowship check-ins are quick.',
+      },
+      400,
+    );
+  }
+
+  if (!rotaryClub) {
+    return jsonResponse(
+      {
+        success: false,
+        code: 'VALIDATION',
+        message: 'Please select your Rotary club or choose non-member.',
       },
       400,
     );
@@ -76,19 +105,22 @@ export async function POST(request: Request) {
   }
 
   const backendUrl = process.env.REGISTRATION_API_URL?.trim() || FALLBACK_BACKEND_URL;
+  const attendanceDate = cleanText(body.attendanceDate) || new Date().toISOString().slice(0, 10);
 
   const payload: Submission = {
     fullName,
-    phone: cleanText(body.phone),
-    email: cleanText(body.email),
+    phone,
+    email,
     rotaryClub,
     classification: cleanText(body.classification),
     purpose,
-    otherPurpose,
-    event: cleanText(body.event) || 'Rotary Club of Kitende Breeze Presidential Installation',
-    date: cleanText(body.date) || '4th July 2026',
-    venue: cleanText(body.venue) || 'Nican Resort, Kampala Uganda',
+    otherPurpose: purpose === 'Other' ? otherPurpose : '',
+    event: cleanText(body.event) || 'Rotary Club of Kitende Breeze Thursday Fellowship',
+    date: cleanText(body.date) || attendanceDate,
+    attendanceDate,
+    venue: cleanText(body.venue) || 'Rotary Club of Kitende Breeze',
     submittedAt: cleanText(body.submittedAt) || new Date().toISOString(),
+    checkInSource: cleanText(body.checkInSource) || 'web',
   };
 
   const controller = new AbortController();
@@ -108,34 +140,33 @@ export async function POST(request: Request) {
 
     clearTimeout(timeout);
 
-    if (backendResponse.status === 409) {
-      return jsonResponse(
-        {
-          success: false,
-          code: 'DUPLICATE',
-          message:
-            'It looks like this guest may already be registered. Please check with the registration desk if you need help.',
-        },
-        409,
-      );
+    let backendData: Partial<RegistrationResponse> | null = null;
+    try {
+      backendData = (await backendResponse.json()) as Partial<RegistrationResponse>;
+    } catch {
+      backendData = null;
     }
 
     if (!backendResponse.ok) {
       return jsonResponse(
         {
           success: false,
-          code: 'UNAVAILABLE',
+          code: backendData?.code || 'UNAVAILABLE',
           message:
+            backendData?.message ||
             'Registration is temporarily unavailable. Please try again in a moment or speak to the registration desk.',
         },
-        502,
+        backendResponse.status === 400 ? 400 : 502,
       );
     }
 
     return jsonResponse(
       {
         success: true,
-        message: 'Registration successful',
+        alreadyRegistered: Boolean(backendData?.alreadyRegistered),
+        message:
+          backendData?.message ||
+          (backendData?.alreadyRegistered ? 'Already checked in for this day.' : 'Registration successful'),
       },
       200,
     );
