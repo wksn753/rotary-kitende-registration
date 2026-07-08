@@ -50,7 +50,7 @@ export type AttendanceResponse = {
   count?: number;
   records?: AttendanceRecord[];
   message?: string;
-  code?: 'UNAVAILABLE' | 'UNKNOWN' | 'UNAUTHORIZED';
+  code?: 'UNAVAILABLE' | 'UNKNOWN' | 'UNAUTHORIZED' | 'BACKEND_UNAUTHORIZED';
 };
 
 /**

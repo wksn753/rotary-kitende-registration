@@ -74,13 +74,26 @@ export async function GET(request: NextRequest) {
     }
 
     if (!backendResponse.ok || !data?.success) {
+      if (backendResponse.status === 401 || backendResponse.status === 403) {
+        return jsonResponse(
+          {
+            success: false,
+            code: 'BACKEND_UNAUTHORIZED',
+            message:
+              data?.message ||
+              'Admin login is active, but the backend attendance API rejected the admin key. Check that ADMIN_API_KEY matches on the frontend and backend deployments.',
+          },
+          502,
+        );
+      }
+
       return jsonResponse(
         {
           success: false,
           code: data?.code || 'UNAVAILABLE',
           message: data?.message || 'Attendance is temporarily unavailable.',
         },
-        backendResponse.status === 401 || backendResponse.status === 403 ? backendResponse.status : 502,
+        502,
       );
     }
 

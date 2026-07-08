@@ -63,3 +63,6 @@ The `Permissions-Policy: browsing-topics` browser warning is not an auth error. 
 ## Admin
 
 Open `/admin`. Unauthenticated users are sent to `/admin/login`; attendance data is only loaded after a valid admin session is present.
+## Backend admin key warning
+
+If the dashboard loads but shows an attendance error, check `ADMIN_API_KEY`. When the Go backend has `ADMIN_API_KEY` set, the frontend deployment must use the exact same value. A backend key mismatch now shows an error on the dashboard instead of clearing the admin session and sending the user back to login.

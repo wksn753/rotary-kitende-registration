@@ -191,18 +191,18 @@ export default function AdminAttendanceClient() {
         cache: 'no-store',
       });
 
-      if (response.status === 401) {
-        clearStoredAdminToken();
-        window.location.replace('/admin/login');
-        return;
-      }
-
       let data: AttendanceResponse | null = null;
 
       try {
         data = (await response.json()) as AttendanceResponse;
       } catch {
         data = null;
+      }
+
+      if (response.status === 401 && data?.code === 'UNAUTHORIZED') {
+        clearStoredAdminToken();
+        window.location.replace('/admin/login');
+        return;
       }
 
       if (!response.ok || !data?.success) {
