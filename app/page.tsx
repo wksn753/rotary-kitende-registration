@@ -102,6 +102,19 @@ const ugandaClubs = [
   'Rotary Club of Tororo',
   'Rotary Club of Wakiso',
   'Rotary Club of Yumbe',
+  'Rotary Club of Nalumunye',
+'Rotary Club of Nalumunye Heights', 
+'Rotary Club of Bwebaja ',
+'Rotary Club of Bwebaja mid city', 
+'Rotary Club of Alright',
+'Rotary Club of Kitende',
+'Rotary Club of Kajjansi',
+'Rotary Club of Namasuba',
+'Rotary Club of Muyenga breeze',
+'Rotary Club of Bunamwaya',
+'Rotary Club of Lubowa',
+'Rotary Club of Medical stores',
+'Rotary Club of Entebbe Base',
 ];
 
 const searchableClubs = ugandaClubs.filter((club) => club !== NON_MEMBER);
