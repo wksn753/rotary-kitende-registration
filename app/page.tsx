@@ -126,6 +126,11 @@ const ugandaClubs = [
   "Rotary Club of Lubowa",
   "Rotary Club of Medical stores",
   "Rotary Club of Entebbe Base",
+  "Rotary Club of Garuga",
+  "Rotary Club of Kigo",
+  "Rotary Club of Nalumunye Katale",
+  "Rotary Club of Seguku",
+  "Rotary Club of Bunga",
 ];
 
 const searchableClubs = Array.from(
